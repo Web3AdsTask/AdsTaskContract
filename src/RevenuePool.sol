@@ -11,16 +11,18 @@ contract RevenuePool is Ownable {
     error InvalidAddress();
 
     // custom events
-    event DividendPoolRatioSet(uint8 ratio);
-    event MarketingPoolRatioSet(uint8 ratio);
+    event PoolRatioSet(
+        uint8 indexed dividendRatio,
+        uint8 indexed marketingRatio
+    );
 
-    event DividendPoolInjected(uint256 amount);
-    event MarketingPoolInjected(uint256 amount);
-    event RevenueInjected(uint256 amount);
+    event DividendPoolInjected(uint256 indexed amount);
+    event MarketingPoolInjected(uint256 indexed amount);
+    event RevenueInjected(uint256 indexed amount);
 
-    event InjectTokenAddressSet(address token);
-    event DividendTokenAddressSet(address token);
-    event MarketingTokenAddressSet(address token);
+    event InjectTokenAddressSet(address indexed token);
+    event DividendTokenAddressSet(address indexed token);
+    event MarketingTokenAddressSet(address indexed token);
 
     event DividendTokenAmountToValue(
         address indexed user,
@@ -47,43 +49,46 @@ contract RevenuePool is Ownable {
     constructor() Ownable(msg.sender) {}
 
     // 设置收益池注入token
-    function setInjectRevenueTokenAddress(address token) public onlyOwner {
+    function setInjectRevenueToken(address token) public onlyOwner {
         if (token == address(0)) revert InvalidAddress();
         injectToken = token;
         emit InjectTokenAddressSet(token);
     }
 
     // 设置分红兑换token
-    function setDividendTokenAddress(address token) public onlyOwner {
+    function setDividendToken(address token) public onlyOwner {
         if (token == address(0)) revert InvalidAddress();
         dividendToken = token;
         emit DividendTokenAddressSet(token);
     }
 
     // 设置营销兑换token
-    function setMarketingTokenAddress(address token) public onlyOwner {
+    function setMarketingToken(address token) public onlyOwner {
         if (token == address(0)) revert InvalidAddress();
         marketingToken = token;
         emit MarketingTokenAddressSet(token);
     }
 
-    // 设置分红池比例
-    function setDividendPoolRatio(uint8 ratio) public onlyOwner {
-        if (ratio == 0 || ratio > 100) revert InvalidRatio();
-        dividendPoolRatio = ratio;
-        emit DividendPoolRatioSet(ratio);
+    // 设置分红池、营销池比例
+    function setPoolRatio(
+        uint8 dividenRatio,
+        uint8 marketingRatio
+    ) public onlyOwner {
+        if (dividenRatio > 100 || marketingRatio > 100) revert InvalidRatio();
+        if (dividenRatio + marketingRatio != 100) revert InvalidRatio();
+        dividendPoolRatio = dividenRatio;
+        marketingPoolRatio = marketingRatio;
+        emit PoolRatioSet(dividenRatio, marketingRatio);
     }
 
-    // 设置营销池比例
-    function setMarketingPoolRatio(uint8 ratio) public onlyOwner {
-        if (ratio == 0 || ratio > 100) revert InvalidRatio();
-        marketingPoolRatio = ratio;
-        emit MarketingPoolRatioSet(ratio);
+    // 查询分红池、营销池比例之和 == 100
+    modifier onlyRatio() {
+        require(dividendPoolRatio + marketingPoolRatio == 100, InvalidRatio());
+        _;
     }
 
     // 注入收益
-    function injectingRevenue(uint256 amount) public onlyOwner {
-        if (dividendPoolRatio + marketingPoolRatio > 100) revert InvalidRatio();
+    function injectingRevenue(uint256 amount) public onlyOwner onlyRatio {
         injectDividendPool((amount * dividendPoolRatio) / 100);
         injectMarketingPool((amount * marketingPoolRatio) / 100);
         emit RevenueInjected(amount);
@@ -126,11 +131,12 @@ contract RevenuePool is Ownable {
     }
 
     // 使用OAXToken兑换分红池
-    function useDividendPool(uint256 amount) public {
+    function exchangeDividendTokenToValue(uint256 amount) public {
         if (dividendPoolAmount > 0) revert InvalidAmount();
 
         // 查询OAXToken兑换分红的价格
         uint256 oaxTokenValue = queryDividendTokenToValue();
+        if (oaxTokenValue == 0) revert InvalidAmount();
 
         // 计算可以兑换的分红额度
         uint256 dividendAmount = amount * oaxTokenValue;
@@ -145,11 +151,12 @@ contract RevenuePool is Ownable {
     }
 
     // 使用OMToken兑换营销池
-    function useMarketingPool(uint256 amount) public {
+    function exchangeMarketingTokenToValue(uint256 amount) public {
         if (amount > marketingPoolAmount) revert InvalidAmount();
 
         // 查询OMToken兑换营销的价格
         uint256 omTokenValue = queryMarketingTokenToValue();
+        if (omTokenValue == 0) revert InvalidAmount();
 
         // 计算可以兑换的营销额度
         uint256 marketingAmount = amount * omTokenValue;

@@ -3,10 +3,9 @@ pragma solidity ^0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
 import "../src/RevenuePool.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "../src/OAXToken.sol";
-import "../src/OMToken.sol";
+import {MockERC20} from "forge-std/mocks/MockERC20.sol";
+import {OAXToken} from "../src/OAXToken.sol";
+import {OMToken} from "../src/OMToken.sol";
 
 contract RevenuePoolTest is Test {
     RevenuePool public revenuePool;
@@ -14,15 +13,15 @@ contract RevenuePoolTest is Test {
     // 合约管理员
     address public owner;
     // 测试用户
-    address public user1;
-    address public user2;
+    address public alice;
+    address public bob;
 
     // 注入的收益token
-    address public revenueToken;
+    MockERC20 public revenueToken;
     // 分红token
-    address public dividendToken;
+    OAXToken public dividendToken;
     // 营销token
-    address public marketingToken;
+    OMToken public marketingToken;
 
     function setUp() public {
         // 创建合约管理员
@@ -30,88 +29,144 @@ contract RevenuePoolTest is Test {
         // 部署合约
         vm.startPrank(owner);
         revenuePool = new RevenuePool();
-        // dividendToken = new OAXToken();
-        // marketingToken = new OMToken();
+        revenueToken = new MockERC20();
+        dividendToken = new OAXToken();
+        marketingToken = new OMToken();
+
         vm.stopPrank();
         // 给管理员分发收益token
-        // deal(ERC20(revenueToken), owner, 1000e18);
+        deal(address(revenueToken), owner, 1000e18);
 
         // 创建测试用户
-        user1 = address(0xBEEF);
-        user2 = address(0xDEAD);
+        alice = address(0xBEEF);
+        bob = address(0xDEAD);
 
         // 给测试用户分发代币
-        // deal(ERC20(revenueToken), users, 1000e18);
+        deal(address(dividendToken), alice, 1000e18);
+        deal(address(marketingToken), bob, 1000e18);
     }
 
     // 测试注入收益token
-    // function testSetInjectRevenueTokenAddress() public {
-    //     vm.prank(owner);
-    //     revenuePool.setInjectRevenueTokenAddress(revenueToken);
+    function testSetInjectRevenueTokenAddress() public {
+        vm.prank(owner);
+        revenuePool.setInjectRevenueToken(address(revenueToken));
 
-    //     // 查询收益token地址
-    //     address injectToken = revenuePool.injectToken();
-    //     assert(injectToken == revenueToken);
-    // }
-
-    function testFailSetInjectRevenueTokenAddress() public {
-        revenuePool.setInjectRevenueTokenAddress(revenueToken);
+        // 查询收益token地址
+        address injectToken = revenuePool.injectToken();
+        assert(injectToken == address(revenueToken));
     }
 
     // 测试设置分红token
     function testSetDividendTokenAddress() public {
         vm.prank(owner);
-        revenuePool.setDividendTokenAddress(dividendToken);
+        revenuePool.setDividendToken(address(dividendToken));
         // 查询分红token地址
         address dividendTokenAddress = revenuePool.dividendToken();
-        assert(dividendTokenAddress == dividendToken);
+        assert(dividendTokenAddress == address(dividendToken));
     }
 
     // 测试设置营销token
     function testSetMarketingTokenAddress() public {
         vm.prank(owner);
-        revenuePool.setMarketingTokenAddress(marketingToken);
+        revenuePool.setMarketingToken(address(marketingToken));
         // 查询营销token地址
         address marketingTokenAddress = revenuePool.marketingToken();
-        assert(marketingTokenAddress == marketingToken);
+        assert(marketingTokenAddress == address(marketingToken));
     }
 
     // 测试设置分红池比例
-    function testSetDividenPoolRatio() public {
+    function testSetPoolRatio() public {
         vm.prank(owner);
-        revenuePool.setDividendPoolRatio(50);
+        revenuePool.setPoolRatio(50, 50);
         // 查询分红池比例
-        uint dividendPoolRatio = revenuePool.dividendPoolRatio();
-        assert(dividendPoolRatio == 50);
-    }
+        uint poolRatio = revenuePool.dividendPoolRatio();
+        assert(poolRatio == 50);
 
-    // 测试设置营销池比例
-    function testSetMarketingPoolRatio() public {
-        vm.prank(owner);
-        revenuePool.setMarketingPoolRatio(50);
         // 查询营销池比例
         uint marketingPoolRatio = revenuePool.marketingPoolRatio();
         assert(marketingPoolRatio == 50);
     }
 
     // 测试注入收益
-    function testInjectingRevenue() public {}
+    function testInjectingRevenue() public {
+        mockSetPoolRatio(50, 50);
+
+        // 校验事件
+        vm.expectEmit(true, false, false, false);
+        emit RevenuePool.RevenueInjected(1000e18);
+        vm.startPrank(owner);
+        revenuePool.injectingRevenue(1000e18);
+        vm.stopPrank();
+    }
 
     // 测试注入分红池
-    function testInjectDividendPool() public {}
+    function testInjectDividendPool() public {
+        vm.startPrank(owner);
+        revenuePool.injectDividendPool(500e18);
+        vm.stopPrank();
+
+        // 查询分红池余额
+        uint256 balance = revenuePool.dividendPoolAmount();
+        assert(balance == 500e18);
+    }
 
     // 测试注入营销池
-    function testInjectMarketingPool() public {}
+    function testInjectMarketingPool() public {
+        vm.startPrank(owner);
+        revenuePool.injectMarketingPool(500e18);
+        vm.stopPrank();
 
-    // 测试 OAXToken 兑换分红价值
-    function testDividendTokenAmountToValue() public {}
+        // 查询营销池余额
+        uint256 balance = revenuePool.marketingPoolAmount();
+        assert(balance == 500e18);
+    }
 
-    // 测试 OMToken 兑换营销价值
-    function testMarketingTokenAmountToValue() public {}
+    // 测试 查询 OAXToken 兑换分红价值
+    function testQueryDividendTokenAmountToValue() public {
+        mockSetPoolRatioAndInjectRevenue(30, 70, 100e18);
+
+        uint256 value = revenuePool.queryDividendTokenToValue();
+        assert(value == 30e18);
+    }
+
+    // 测试 查询 OMToken 兑换营销价值
+    function testQueryMarketingTokenAmountToValue() public {
+        mockSetPoolRatioAndInjectRevenue(30, 70, 100e18);
+
+        uint256 value = revenuePool.queryMarketingTokenToValue();
+        assert(value == 70e18);
+    }
 
     // 测试 OAXToken 兑换分红
-    function testUseDividendPool() public {}
+    function testExechangeDividendTokenToValue() public {
+        mockSetPoolRatioAndInjectRevenue(40, 60, 100e18);
+
+        vm.prank(alice);
+        revenuePool.exchangeDividendTokenToValue(500e18);
+    }
 
     // 测试 OMToken 兑换营销
-    function testUseMarketingPool() public {}
+    function testExchangeMarketingTokenToValue() public {
+        mockSetPoolRatioAndInjectRevenue(40, 60, 100e18);
+
+        vm.prank(bob);
+        revenuePool.exchangeMarketingTokenToValue(500e18);
+    }
+
+    // 模拟设置收益池比例
+    function mockSetPoolRatio(uint8 dividenRatio, uint8 marketingRatio) public {
+        vm.prank(owner);
+        revenuePool.setPoolRatio(dividenRatio, marketingRatio);
+    }
+
+    function mockSetPoolRatioAndInjectRevenue(
+        uint8 dividenRatio,
+        uint8 marketingRatio,
+        uint256 amount
+    ) public {
+        vm.startPrank(owner);
+        revenuePool.setPoolRatio(dividenRatio, marketingRatio);
+        revenuePool.injectingRevenue(amount);
+        vm.stopPrank();
+    }
 }
