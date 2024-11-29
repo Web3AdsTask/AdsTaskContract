@@ -13,7 +13,7 @@ contract StakingPoolTest is Test {
 
     address public alice;
     // 质押每日收益
-    uint256 constant profitPerDay = 1 * 1e18;
+    uint256 constant profitPerDay = 1 ether / 1_000;
 
     uint256 constant stakeAmount1 = 100 * 1e18;
     uint256 constant stakeAmount2 = 200 * 1e18;
@@ -23,11 +23,7 @@ contract StakingPoolTest is Test {
         oatToken = new OAToken();
         oaxToken = new OAXToken();
 
-        stakingPool = new StakingPool(
-            address(oatToken),
-            address(oaxToken),
-            profitPerDay
-        );
+        stakingPool = new StakingPool(address(oatToken), address(oaxToken), profitPerDay);
 
         alice = address(0xBEEF);
 
@@ -45,15 +41,20 @@ contract StakingPoolTest is Test {
         mockUserStake();
 
         // 验证质押额度
-        (uint256 stakeNumber, , ) = stakingPool.stakeInfos(alice);
+        (uint256 stakeNumber,,) = stakingPool.stakeInfos(alice);
         assertEq(stakeNumber, stakeAmount1 + stakeAmount2, "stake failed");
     }
 
     function testUnstake() public {
         mockUserStake();
+
+        // 取出部份质押额度
+        vm.prank(alice);
+        stakingPool.unstake(stakeAmount2);
+
         // 验证质押额度
-        (uint256 stakeNumber, , ) = stakingPool.stakeInfos(alice);
-        assertEq(stakeNumber, stakeAmount2, "unstake failed");
+        (uint256 stakeNumber,,) = stakingPool.stakeInfos(alice);
+        assertEq(stakeNumber, stakeAmount1, "unstake failed");
     }
 
     function testClaimTokens() public {
@@ -63,7 +64,7 @@ contract StakingPoolTest is Test {
         stakingPool.claimTokens();
 
         // 验证质押额度
-        (uint256 stakeNumber, , ) = stakingPool.stakeInfos(alice);
+        (uint256 stakeNumber,,) = stakingPool.stakeInfos(alice);
         assertEq(stakeNumber, stakeAmount1 + stakeAmount2, "stake failed");
 
         // 验证alice钱包oaxToken余额
@@ -80,22 +81,14 @@ contract StakingPoolTest is Test {
         vm.warp(block.timestamp + mockWarpTime);
         // 验证质押额度
         uint256 stakeAmount = stakingPool.checkStakePools(alice).stakeNumber;
-        assertEq(
-            stakeAmount,
-            stakeAmount1 + stakeAmount2,
-            "checkStakePools failed"
-        );
+        assertEq(stakeAmount, stakeAmount1 + stakeAmount2, "checkStakePools failed");
         // 验证收益
-        uint256 unClaimNumber = stakingPool
-            .checkStakePools(alice)
-            .unClaimNumber;
-
-        uint256 calculatedUnClaimNum = stakeAmount1 *
-            mockWarpTime *
-            profitPerDay +
-            (stakeAmount1 + stakeAmount2) *
-            mockWarpTime *
-            profitPerDay;
+        console.log("--- checkStakePools ---");
+        uint256 unClaimNumber = stakingPool.checkStakePools(alice).unClaimNumber;
+        uint256 calculatedUnClaimNum = stakeAmount1 * mockWarpTime * profitPerDay / 1 days / 1 ether
+            + (stakeAmount1 + stakeAmount2) * mockWarpTime * profitPerDay / 1 days / 1 ether;
+        console.log("--- calculatedUnClaimNum ---");
+        console.log(calculatedUnClaimNum);
         // 100 * 10 + 300 * 10
         assertEq(unClaimNumber, calculatedUnClaimNum, "checkStakePools failed");
     }
@@ -103,12 +96,15 @@ contract StakingPoolTest is Test {
     function mockUserStake() public {
         vm.startPrank(alice);
         // 第一笔质押
+        console.log("--- mockUserStake1 ---");
         stakingPool.stake(stakeAmount1);
+        console.log("~~~~~ mockUserStake1 finish ~~~~~");
         // 模拟时间
         vm.warp(block.timestamp + mockWarpTime);
         // 第二笔质押
+        console.log("--- mockUserStake2 ---");
         stakingPool.stake(stakeAmount2);
-
+        console.log("~~~~~ mockUserStake2 finish ~~~~~");
         vm.stopPrank();
     }
 }

@@ -5,7 +5,6 @@ import {Test, console} from "forge-std/Test.sol";
 import {PlayerPlatform} from "../src/PlayerPlatform.sol";
 import {OMToken} from "../src/OMToken.sol";
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract PlayerPlatformTest is Test {
@@ -20,6 +19,8 @@ contract PlayerPlatformTest is Test {
         (owner, ownerPK) = makeAddrAndKey("1337");
 
         vm.startPrank(owner);
+        console.log("-- owner builder: ");
+        console.log(owner);
         omt = new OMToken();
         playerPlatform = new PlayerPlatform(address(omt));
 
@@ -29,26 +30,21 @@ contract PlayerPlatformTest is Test {
         alice = address(0xBEEF);
     }
 
-    function testClaimOMT() public {
+    function testPermitClaimOMT() public {
         console.log("testClaimOMT");
-    }
-
-    // 构造签名信息
-    function makeSignData(uint256 amount) public returns (bytes memory) {
+        uint256 amount = 0.5 ether;
+        uint256 deadline = block.timestamp + 5 hours;
         // 打包消息
-        bytes32 msgHash = keccak256(
-            abi.encodePacked(
-                "claimOMT(address,uint256,uint256)",
-                alice,
-                amount,
-                block.timestamp + 5 minutes
-            )
-        );
-
+        bytes32 msgHash =
+            keccak256(abi.encodePacked("premitClaimOMT(address,uint256,uint256)", alice, amount, deadline));
         // 签名消息
         bytes32 ethSignHash = MessageHashUtils.toEthSignedMessageHash(msgHash);
-        bytes memory signData = ECDSA.sign(ownerPK, ethSignHash);
+        // 使用私钥签名
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPK, ethSignHash);
 
-        return signData;
+        playerPlatform.premitClaimOMT(alice, amount, deadline, v, r, s);
+
+        // 校验用户OMToken额度
+        assertEq(omt.balanceOf(alice), amount, "invalid alice omt amount");
     }
 }

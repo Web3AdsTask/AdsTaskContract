@@ -4,8 +4,6 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract PartnerIDO is Ownable {
     // custom errors
     error invalidAmount();
@@ -18,7 +16,7 @@ contract PartnerIDO is Ownable {
     // custom events
     event PresaleSuccess(address indexed account, uint256 indexed amount);
     event PresaleTriggerEnd();
-    event ClaimSuccess(address indexed account, uint256 indexed amount);
+    event ClaimSuccess(address indexed account, uint256 indexed amount, uint256 indexed price);
     event RefundSuccess(address indexed account, uint256 indexed amount);
     event WithdrawSuccess(address indexed account, uint256 indexed amount);
 
@@ -78,9 +76,6 @@ contract PartnerIDO is Ownable {
 
         // 更新预售价格，处理精度
         preTokenMinPrice = minETHTarget / (preTokenAmount / 1 ether);
-
-        console.log("--- setPresaleToken ---");
-        console.log(preTokenMinPrice);
     }
 
     // 主动触发结束（项目方手动结束）
@@ -91,19 +86,15 @@ contract PartnerIDO is Ownable {
     }
 
     // 预售成功情况下，给用户发币（用户主动来领币）
-    function claim() external onlySuccess {
+    function claim() external {
         uint256 ethAmount = balances[msg.sender];
         if (ethAmount == 0) revert invalidAmount();
         uint256 realPrice = realTokenPrice();
-        console.log("--- claimTokenPrice ---");
-        console.log(realPrice);
-        console.log(ethAmount);
         uint256 idoTokenAmount = realClaimAmount(ethAmount);
-        console.log(idoTokenAmount);
         balances[msg.sender] = 0;
         idoToken.transferFrom(owner(), msg.sender, idoTokenAmount);
 
-        emit ClaimSuccess(msg.sender, idoTokenAmount);
+        emit ClaimSuccess(msg.sender, idoTokenAmount, realPrice);
     }
 
     // 预售失败情况下，给用户退款（用户自己来领取退款）
@@ -113,7 +104,7 @@ contract PartnerIDO is Ownable {
             balances[msg.sender] = 0;
 
             // 退款 成功
-            (bool succ, ) = payable(msg.sender).call{value: eths}("");
+            (bool succ,) = payable(msg.sender).call{value: eths}("");
             if (succ) {
                 emit RefundSuccess(msg.sender, eths);
             }
@@ -125,7 +116,7 @@ contract PartnerIDO is Ownable {
         // 此时totalETH 和 address(this).banlance 的值应该相等
         uint256 eths = address(this).balance;
         // 提取
-        (bool succ, ) = payable(msg.sender).call{value: eths}("");
+        (bool succ,) = payable(msg.sender).call{value: eths}("");
         if (succ) {
             emit WithdrawSuccess(msg.sender, eths);
         }
@@ -141,41 +132,34 @@ contract PartnerIDO is Ownable {
 
     // 预售成功，计算认购eth数量，实际领token数量
     function realClaimAmount(uint256 eths) public view returns (uint256) {
-        return eths / realTokenPrice();
+        return eths * 1 ether / realTokenPrice();
     }
 
     modifier singleAmountLimit(uint256 amount) {
-        if (amount < minETHAmount || amount > maxETHAmount)
+        if (amount < minETHAmount || amount > maxETHAmount) {
             revert invalidLimtAmount();
-        if (balances[msg.sender] + amount > maxETHTarge)
+        }
+        if (balances[msg.sender] + amount > maxETHTarge) {
             revert moreThanSingleMaxAmount();
+        }
         _;
     }
 
     modifier onlySuccess() {
         // 结束 && 募集成功
-        require(
-            checkIsEnd() && totalETH >= 100 ether,
-            presaleActiveOrInvalidAmount()
-        );
+        require(checkIsEnd() && totalETH >= 100 ether, presaleActiveOrInvalidAmount());
         _;
     }
 
     modifier onlyFail() {
         // 结束 && 募集失败
-        require(
-            checkIsEnd() && totalETH < 100 ether,
-            presaleActiveOrInvalidAmount()
-        );
+        require(checkIsEnd() && totalETH < 100 ether, presaleActiveOrInvalidAmount());
         _;
     }
 
     modifier onlyActive() {
         // 募集进行中
-        require(
-            !checkIsEnd() && totalETH < 200 ether,
-            presaleEndOrInvalidAmount()
-        );
+        require(!checkIsEnd() && totalETH < 200 ether, presaleEndOrInvalidAmount());
         _;
     }
 

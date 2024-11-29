@@ -22,11 +22,15 @@ contract OAXToken is ERC20, Ownable {
     }
 
     modifier onlyAdmin() {
-        require(admins[msg.sender], invalidAdmin());
+        require(admins[msg.sender] || msg.sender == owner(), invalidAdmin());
         _;
     }
 
     function mint(address to, uint256 amount) public onlyAdmin {
         _mint(to, amount);
+    }
+
+    function burn(address from, uint256 amount) public {
+        _burn(from, amount);
     }
 }

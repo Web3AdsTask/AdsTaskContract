@@ -30,11 +30,7 @@ contract StakingPool is Ownable {
     uint256 public profitRatePerday;
     mapping(address => StakeInfoStruct) public stakeInfos;
 
-    constructor(
-        address _stakeTokenAddress,
-        address _profitTokenAddress,
-        uint256 _profitRate
-    ) Ownable(msg.sender) {
+    constructor(address _stakeTokenAddress, address _profitTokenAddress, uint256 _profitRate) Ownable(msg.sender) {
         stakeToken = IERC20(_stakeTokenAddress);
         profitToken = OAXToken(_profitTokenAddress);
         profitRatePerday = _profitRate;
@@ -48,11 +44,13 @@ contract StakingPool is Ownable {
 
     // 质押
     function stake(uint256 amount) external {
-        if (IERC20(stakeToken).allowance(msg.sender, address(this)) < amount)
+        if (IERC20(stakeToken).allowance(msg.sender, address(this)) < amount) {
             revert allowanceIsNotEnough();
+        }
 
-        if (IERC20(stakeToken).balanceOf(msg.sender) < amount)
+        if (IERC20(stakeToken).balanceOf(msg.sender) < amount) {
             revert balanceIsNotEnough();
+        }
 
         // user将质押的Token转入StakePool合约
         IERC20(stakeToken).transferFrom(msg.sender, address(this), amount);
@@ -66,8 +64,9 @@ contract StakingPool is Ownable {
 
     // 解除质押
     function unstake(uint256 amount) external hadStaked {
-        if (stakeInfos[msg.sender].stakeNumber < amount)
+        if (stakeInfos[msg.sender].stakeNumber < amount) {
             revert stakeAmountIsNotEnough();
+        }
 
         stakeInfos[msg.sender].stakeNumber -= amount;
         // 将StakePool的RNT转给user
@@ -89,16 +88,13 @@ contract StakingPool is Ownable {
     }
 
     // 计算收益
-    function updatestakingIncome(
-        address account
-    ) public returns (uint256 unClaimNum) {
+    function updatestakingIncome(address account) public returns (uint256 unClaimNum) {
         StakeInfoStruct memory stakeInfo = stakeInfos[account];
         if (stakeInfo.stakeStartTime > 0) {
             uint256 stakeTime = block.timestamp - stakeInfo.stakeStartTime;
-
-            stakeInfo.unClaimNumber +=
-                (stakeInfo.stakeNumber * stakeTime * profitRatePerday) /
-                1 days;
+            // 计算收益
+            uint256 newUnClaimNum = (stakeInfo.stakeNumber * stakeTime * profitRatePerday) / 1 ether / 1 days;
+            stakeInfo.unClaimNumber += newUnClaimNum;
             unClaimNum = stakeInfo.unClaimNumber;
         }
         stakeInfo.stakeStartTime = block.timestamp;
@@ -107,9 +103,7 @@ contract StakingPool is Ownable {
     }
 
     // 查询质押信息
-    function checkStakePools(
-        address account
-    ) external returns (StakeInfoStruct memory) {
+    function checkStakePools(address account) external returns (StakeInfoStruct memory) {
         updatestakingIncome(account);
         StakeInfoStruct memory stakeInfo = stakeInfos[account];
         return stakeInfo;
