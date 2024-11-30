@@ -22,7 +22,8 @@ contract PlayerPlatformTest is Test {
         console.log("-- owner builder: ");
         console.log(owner);
         omt = new OMToken();
-        playerPlatform = new PlayerPlatform(address(omt));
+        playerPlatform = new PlayerPlatform();
+        playerPlatform.setPlayToken(address(omt));
 
         omt.setAdmin(address(playerPlatform), true);
         vm.stopPrank();

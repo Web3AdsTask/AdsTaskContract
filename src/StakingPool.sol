@@ -30,7 +30,12 @@ contract StakingPool is Ownable {
     uint256 public profitRatePerday;
     mapping(address => StakeInfoStruct) public stakeInfos;
 
-    constructor(address _stakeTokenAddress, address _profitTokenAddress, uint256 _profitRate) Ownable(msg.sender) {
+    constructor() Ownable(msg.sender) {}
+
+    function setStake(address _stakeTokenAddress, address _profitTokenAddress, uint256 _profitRate)
+        external
+        onlyOwner
+    {
         stakeToken = IERC20(_stakeTokenAddress);
         profitToken = OAXToken(_profitTokenAddress);
         profitRatePerday = _profitRate;

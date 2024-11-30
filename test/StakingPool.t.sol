@@ -23,7 +23,8 @@ contract StakingPoolTest is Test {
         oatToken = new OAToken();
         oaxToken = new OAXToken();
 
-        stakingPool = new StakingPool(address(oatToken), address(oaxToken), profitPerDay);
+        stakingPool = new StakingPool();
+        stakingPool.setStake(address(oatToken), address(oaxToken), profitPerDay);
 
         alice = address(0xBEEF);
 

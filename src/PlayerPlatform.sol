@@ -24,7 +24,9 @@ contract PlayerPlatform is Ownable {
 
     mapping(address => uint256) public playerOMT;
 
-    constructor(address _tokenAddress) Ownable(msg.sender) {
+    constructor() Ownable(msg.sender) {}
+
+    function setPlayToken(address _tokenAddress) external onlyOwner {
         omt = OMToken(_tokenAddress);
     }
 

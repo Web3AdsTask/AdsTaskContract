@@ -36,8 +36,8 @@ contract PartnerIDO is Ownable {
     uint256 public maxETHTarge = 200 ether; // 最高募集目标
     uint256 public preTokenMinPrice = minETHTarget / preTokenAmount; // 预售价格
 
-    uint256 public minETHAmount = 0.01 ether; // 最低买入
-    uint256 public maxETHAmount = 0.1 ether; // 最高买入[单个用户最高买入]
+    uint256 public minETHAmount = 0.1 ether; // 最低买入
+    uint256 public maxETHAmount = 1 ether; // 最高买入[单个用户最高买入]
 
     constructor() Ownable(msg.sender) {}
 
@@ -50,7 +50,7 @@ contract PartnerIDO is Ownable {
 
         totalETH += msg.value;
         // 筹集到最高额度，募集结束
-        if (totalETH >= 200 ether) {
+        if (totalETH >= maxETHTarge) {
             isEnd = true;
 
             emit PresaleSuccess(msg.sender, totalETH);
@@ -147,19 +147,19 @@ contract PartnerIDO is Ownable {
 
     modifier onlySuccess() {
         // 结束 && 募集成功
-        require(checkIsEnd() && totalETH >= 100 ether, presaleActiveOrInvalidAmount());
+        require(checkIsEnd() && totalETH >= minETHTarget, presaleActiveOrInvalidAmount());
         _;
     }
 
     modifier onlyFail() {
         // 结束 && 募集失败
-        require(checkIsEnd() && totalETH < 100 ether, presaleActiveOrInvalidAmount());
+        require(checkIsEnd() && totalETH < minETHTarget, presaleActiveOrInvalidAmount());
         _;
     }
 
     modifier onlyActive() {
         // 募集进行中
-        require(!checkIsEnd() && totalETH < 200 ether, presaleEndOrInvalidAmount());
+        require(!checkIsEnd() && totalETH < maxETHTarge, presaleEndOrInvalidAmount());
         _;
     }
 
