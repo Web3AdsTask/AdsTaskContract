@@ -51,8 +51,11 @@ contract PartnerIDOTest is Test {
     }
 
     function testPresale() public {
-        uint256 aliceBuyAmount = 0.1 ether;
-        uint256 bobBuyAmount = 0.05 ether;
+        // 模拟用户购买
+        mockSetPresaleToken();
+
+        uint256 aliceBuyAmount = 0.5 ether;
+        uint256 bobBuyAmount = 0.1 ether;
         // 直接往合约转账
         vm.prank(alice);
         (bool succ,) = address(partnerIDO).call{value: aliceBuyAmount}("");

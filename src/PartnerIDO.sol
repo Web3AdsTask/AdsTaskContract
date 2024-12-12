@@ -12,6 +12,7 @@ contract PartnerIDO is Ownable {
     error presaleActiveOrInvalidAmount();
     error presaleEndOrInvalidAmount();
     error moreThanMaxETHTargetAmount();
+    error transferFail();
 
     // custom events
     event PresaleSuccess(address indexed account, uint256 indexed amount);
@@ -105,9 +106,8 @@ contract PartnerIDO is Ownable {
 
             // 退款 成功
             (bool succ,) = payable(msg.sender).call{value: eths}("");
-            if (succ) {
-                emit RefundSuccess(msg.sender, eths);
-            }
+            require(succ, transferFail());
+            emit RefundSuccess(msg.sender, eths);
         }
     }
 
@@ -117,9 +117,8 @@ contract PartnerIDO is Ownable {
         uint256 eths = address(this).balance;
         // 提取
         (bool succ,) = payable(msg.sender).call{value: eths}("");
-        if (succ) {
-            emit WithdrawSuccess(msg.sender, eths);
-        }
+        require(succ, transferFail());
+        emit WithdrawSuccess(msg.sender, eths);
     }
 
     // 预售成功，token实际价格
@@ -164,7 +163,10 @@ contract PartnerIDO is Ownable {
     }
 
     function checkIsEnd() public returns (bool) {
-        if (isEnd || block.timestamp > endTime) {
+        if (isEnd) {
+            return true;
+        }
+        if (block.timestamp > endTime) {
             isEnd = true;
             return true;
         }
